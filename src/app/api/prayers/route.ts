@@ -32,6 +32,23 @@ const fetchHabousHTML = (city: string): Promise<string> => {
   });
 };
 
+const MOROCCAN_MONTHS = [
+  "يناير", "فبراير", "مارس", "أبريل", "ماي", "يونيو",
+  "يوليوز", "غشت", "شتنبر", "أكتوبر", "نونبر", "دجنبر"
+];
+
+function getMonthsFromHeader(headerText: string): number[] {
+  const months: number[] = [];
+  const parts = headerText.split('/');
+  for (const part of parts) {
+    const idx = MOROCCAN_MONTHS.findIndex(m => part.includes(m));
+    if (idx !== -1) {
+      months.push(idx + 1); // 1-indexed (1-12)
+    }
+  }
+  return months;
+}
+
 export async function GET(request: NextRequest) {
   // Hardcoded to Rissani as per V2 requirements
   const city = "129";
@@ -40,9 +57,17 @@ export async function GET(request: NextRequest) {
     const html = await fetchHabousHTML(city);
     const $ = cheerio.load(html);
 
+    const headerRow = $("table#horaire tr:first-child");
+    const monthHeaderText = $(headerRow.find("th, td")[2]).text().trim();
+    const parsedMonths = getMonthsFromHeader(monthHeaderText);
+
     const rows = $("table#horaire tr:not(:first-child)"); // Skip header row
 
     const monthlySchedule: any[] = [];
+    
+    const currentYear = new Date().getFullYear();
+    let currentMonthIdx = 0;
+    let previousDay = 0;
 
     rows.each((index, element) => {
       const tds = $(element).find("td");
@@ -61,8 +86,31 @@ export async function GET(request: NextRequest) {
         const gregorianDay = parseInt($(tds[2]).text().trim(), 10);
         
         if (!isNaN(gregorianDay)) {
+          if (previousDay > 0 && gregorianDay < previousDay) {
+              // Month rollover
+              if (currentMonthIdx < parsedMonths.length - 1) {
+                  currentMonthIdx++;
+              }
+          }
+          
+          const month = parsedMonths[currentMonthIdx] || new Date().getMonth() + 1;
+          let year = currentYear;
+          
+          // Handle Dec/Jan rollover
+          if (parsedMonths[0] === 12 && month === 1) {
+             if (new Date().getMonth() === 11) {
+                 year = currentYear + 1;
+             }
+          } else if (parsedMonths[0] === 12 && month === 12 && new Date().getMonth() === 0) {
+              year = currentYear - 1;
+          }
+
+          previousDay = gregorianDay;
+
           monthlySchedule.push({
             gregorianDay,
+            gregorianMonth: month,
+            gregorianYear: year,
             fajr: $(tds[3]).text().trim(),
             shuruq: $(tds[4]).text().trim(),
             dhuhr: $(tds[5]).text().trim(),

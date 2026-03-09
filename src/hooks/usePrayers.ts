@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { parse, isAfter, isBefore, differenceInSeconds, addDays } from "date-fns";
 
 export type DailySchedule = {
   gregorianDay: number;
+  gregorianMonth: number;
+  gregorianYear: number;
   fajr: string;
   shuruq?: string;
   dhuhr: string;
@@ -64,15 +65,37 @@ export function usePrayers() {
 
     const calculateTimes = () => {
       const now = new Date();
-      const currentDayNumber = now.getDate();
+
+      // Get current date in Morocco
+      const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Casablanca',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const [dayStr, monthStr, yearStr] = dateFormatter.format(now).split('/');
+      const currentDayNumber = parseInt(dayStr, 10);
+      const currentMonthNumber = parseInt(monthStr, 10);
+      const currentYearNumber = parseInt(yearStr, 10);
 
       // Find today's and tomorrow's schedules
-      const today = monthSchedule.find((s) => s.gregorianDay === currentDayNumber);
+      const today = monthSchedule.find(
+        (s) => s.gregorianDay === currentDayNumber && s.gregorianMonth === currentMonthNumber && s.gregorianYear === currentYearNumber
+      );
       
-      // Handle end of month rollover safely by looking for next day or wrapping to 1
-      let tomorrow = monthSchedule.find((s) => s.gregorianDay === (currentDayNumber + 1));
-      if (!tomorrow && currentDayNumber > 27) {
-         // If tomorrow isn't found and it's end of month, fallback to today to prevent crash
+      const tomorrowDate = new Date(now);
+      tomorrowDate.setDate(now.getDate() + 1);
+      const [tDay, tMonth, tYear] = dateFormatter.format(tomorrowDate).split('/');
+      const tomorrowDayNumber = parseInt(tDay, 10);
+      const tomorrowMonthNumber = parseInt(tMonth, 10);
+      const tomorrowYearNumber = parseInt(tYear, 10);
+
+      let tomorrow = monthSchedule.find(
+        (s) => s.gregorianDay === tomorrowDayNumber && s.gregorianMonth === tomorrowMonthNumber && s.gregorianYear === tomorrowYearNumber
+      );
+      
+      if (!tomorrow) {
+         // If tomorrow isn't found, fallback to today to prevent crash
          // (Ideally, we'd fetch the next month's data, but Habous only shows current month)
          tomorrow = monthSchedule[0];
       }
@@ -81,7 +104,7 @@ export function usePrayers() {
         return; // Timetable likely hasn't updated for the new month on Habous yet
       }
 
-      setTodaysSchedule(today);
+      let activeSchedule = today;
 
       const orderedKeys: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
       
@@ -89,15 +112,20 @@ export function usePrayers() {
       let nextP: PrayerKey = "fajr";
       let nextPTimeStr = today.fajr;
 
-      const timesAsDates = orderedKeys.map((key) => {
-        return parse(today[key], "HH:mm", new Date());
+      const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Casablanca',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       });
+      const currentTimeStr = timeFormatter.format(now);
 
       // Find current and next
       let foundNext = false;
       for (let i = 0; i < orderedKeys.length; i++) {
-        if (isBefore(now, timesAsDates[i])) {
-          nextP = orderedKeys[i];
+        const key = orderedKeys[i];
+        if (currentTimeStr < today[key]) {
+          nextP = key;
           nextPTimeStr = today[nextP];
           currentP = i === 0 ? "isha" : orderedKeys[i - 1]; // if before fajr, current is isha
           foundNext = true;
@@ -111,11 +139,13 @@ export function usePrayers() {
         currentP = "isha";
         if (tomorrow) {
           nextPTimeStr = tomorrow.fajr;
+          activeSchedule = tomorrow;
         } else {
           nextPTimeStr = today.fajr; // Safe fallback
         }
       }
 
+      setTodaysSchedule(activeSchedule);
       setCurrentPrayer({ key: currentP, name: prayerNamesAr[currentP] });
       setNextPrayer({ key: nextP, name: prayerNamesAr[nextP], time: nextPTimeStr });
     };
@@ -129,3 +159,4 @@ export function usePrayers() {
 
   return { todaysSchedule, currentPrayer, nextPrayer, loading, error };
 }
+
