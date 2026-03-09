@@ -52,7 +52,7 @@ export default function Home() {
           
           {/* We pass the reconstructed prayersObj to the schedule component */}
           <div className="w-full max-w-2xl">
-            <PrayerSchedule prayers={prayersObj} currentPrayer={currentPrayer} loading={loading} />
+            <PrayerSchedule prayers={prayersObj} nextPrayer={nextPrayer} loading={loading} />
           </div>
         </div>
       </div>

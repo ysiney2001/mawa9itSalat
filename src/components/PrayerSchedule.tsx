@@ -11,11 +11,11 @@ const prayerNamesAr: Record<PrayerKey, string> = {
 
 interface PrayerScheduleProps {
   prayers: Record<PrayerKey, string> | null;
-  currentPrayer: { key: PrayerKey; name: string } | null;
+  nextPrayer: { key: PrayerKey; name: string } | null;
   loading: boolean;
 }
 
-export default function PrayerSchedule({ prayers, currentPrayer, loading }: PrayerScheduleProps) {
+export default function PrayerSchedule({ prayers, nextPrayer, loading }: PrayerScheduleProps) {
   if (loading) {
     return (
       <div className="w-full space-y-4">
@@ -33,21 +33,21 @@ export default function PrayerSchedule({ prayers, currentPrayer, loading }: Pray
   return (
     <div className="w-full space-y-3">
       {prayerItems.map((key) => {
-        const isCurrent = currentPrayer?.key === key;
+        const isNext = nextPrayer?.key === key;
         return (
           <div
             key={key}
             className={cn(
               "flex justify-between items-center px-8 py-5 rounded-[2rem] transition-all duration-500",
-              isCurrent
+              isNext
                 ? "bg-gradient-to-r from-islamic-gold-light to-islamic-gold text-white shadow-xl scale-[1.03] ring-1 ring-white/20"
                 : "bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20"
             )}
           >
-            <span className={cn("text-2xl", isCurrent ? "font-bold" : "font-medium opacity-90")}>
+            <span className={cn("text-2xl", isNext ? "font-bold" : "font-medium opacity-90")}>
               {prayerNamesAr[key]}
             </span>
-            <span className={cn("text-3xl font-bold tabular-nums", isCurrent ? "" : "opacity-80")}>
+            <span className={cn("text-3xl font-bold tabular-nums", isNext ? "" : "opacity-80")}>
               {prayers[key]}
             </span>
           </div>
